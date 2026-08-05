@@ -341,11 +341,11 @@ public interface PageAssertions {
    * }</pre>
    *
    * <p> Note that screenshot assertions only work with the Playwright driver's screenshot comparison support; there is no
-   * concept of a test-runner-managed snapshot directory as in {@code @playwright/test}. By default, baseline images are
-   * stored under {@code src/test/resources/__screenshots__/<TestClassName>/<name>}, overridable via the {@code
-   * playwright.snapshotDir} system property. Pass {@code -Dplaywright.updateSnapshots=true} to (re-)generate baselines.
+   * test-runner-managed snapshot directory or configuration as in {@code @playwright/test}. By default, baseline images
+   * are stored under {@code src/test/resources/__screenshots__/<name>}, overridable via the {@code playwright.snapshotDir}
+   * system property. Pass {@code -Dplaywright.updateSnapshots=true} to (re-)generate baselines.
    *
-   * @param name Snapshot name. Must have a {@code .png} or {@code .webp} extension, the screenshot is captured in the corresponding format. Both formats are lossless.
+   * @param name Snapshot name. Must have a {@code .png} extension.
    * @since v1.23
    */
   default void hasScreenshot(String name) {
@@ -360,7 +360,7 @@ public interface PageAssertions {
    * assertThat(page).hasScreenshot("image.png");
    * }</pre>
    *
-   * @param name Snapshot name. Must have a {@code .png} or {@code .webp} extension, the screenshot is captured in the corresponding format. Both formats are lossless.
+   * @param name Snapshot name. Must have a {@code .png} extension.
    * @since v1.23
    */
   void hasScreenshot(String name, HasScreenshotOptions options);
@@ -373,7 +373,7 @@ public interface PageAssertions {
    * assertThat(page).hasScreenshot(new String[] {"folder", "image.png"});
    * }</pre>
    *
-   * @param nameSegments Snapshot name segments that will be joined to form the file name. Must have a {@code .png} or {@code .webp} extension on the last segment.
+   * @param nameSegments Snapshot name segments that will be joined to form the file path. The last segment must have a {@code .png} extension.
    * @since v1.23
    */
   default void hasScreenshot(String[] nameSegments) {
@@ -383,35 +383,10 @@ public interface PageAssertions {
    * This function will wait until two consecutive page screenshots yield the same result, and then compare the last
    * screenshot with the expectation.
    *
-   * @param nameSegments Snapshot name segments that will be joined to form the file name. Must have a {@code .png} or {@code .webp} extension on the last segment.
+   * @param nameSegments Snapshot name segments that will be joined to form the file path. The last segment must have a {@code .png} extension.
    * @since v1.23
    */
   void hasScreenshot(String[] nameSegments, HasScreenshotOptions options);
-  /**
-   * This function will wait until two consecutive page screenshots yield the same result, and then compare the last
-   * screenshot with the expectation.
-   *
-   * <p> The snapshot is stored in the PNG format. To store it in the WebP format instead, pass a snapshot name with the
-   * {@code .webp} extension via {@link com.microsoft.playwright.assertions.PageAssertions#hasScreenshot
-   * PageAssertions.hasScreenshot()}.
-   *
-   * <p> <strong>Usage</strong>
-   * <pre>{@code
-   * assertThat(page).hasScreenshot();
-   * }</pre>
-   *
-   * @since v1.23
-   */
-  default void hasScreenshot() {
-    hasScreenshot((HasScreenshotOptions) null);
-  }
-  /**
-   * This function will wait until two consecutive page screenshots yield the same result, and then compare the last
-   * screenshot with the expectation.
-   *
-   * @since v1.23
-   */
-  void hasScreenshot(HasScreenshotOptions options);
   /**
    * Ensures the page has the given title.
    *

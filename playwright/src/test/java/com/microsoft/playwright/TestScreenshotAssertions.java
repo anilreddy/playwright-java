@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestScreenshotAssertions extends TestBase {
-  private static final Path SNAPSHOT_ROOT = Paths.get("src/test/resources/__screenshots__/TestScreenshotAssertions");
+  private static final Path SNAPSHOT_ROOT = Paths.get("src/test/resources/__screenshots__");
 
   @BeforeEach
   @AfterEach
@@ -89,5 +89,26 @@ public class TestScreenshotAssertions extends TestBase {
     Locator locator = page.locator("#box");
     assertThat(locator).hasScreenshot("locator-baseline.png");
     assertTrue(Files.exists(SNAPSHOT_ROOT.resolve("locator-baseline.png")));
+  }
+
+  @Test
+  void shouldSupportNameSegments() {
+    page.setContent("<div style='width:20px;height:20px;background:black;'></div>");
+    assertThat(page).hasScreenshot(new String[] {"nested", "page-nested.png"});
+    assertTrue(Files.exists(SNAPSHOT_ROOT.resolve("nested").resolve("page-nested.png")));
+  }
+
+  @Test
+  void shouldRejectNonPngExtension() {
+    page.setContent("<div>Hello</div>");
+    PlaywrightException e = assertThrows(PlaywrightException.class, () ->
+      assertThat(page).hasScreenshot("image.webp"));
+    assertTrue(e.getMessage().contains(".png"), e.getMessage());
+  }
+
+  @Test
+  void shouldRequireAnExplicitName() {
+    page.setContent("<div>Hello</div>");
+    assertThrows(PlaywrightException.class, () -> assertThat(page).hasScreenshot((String) null));
   }
 }

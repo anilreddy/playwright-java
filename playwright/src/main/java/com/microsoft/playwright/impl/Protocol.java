@@ -17,6 +17,10 @@
 package com.microsoft.playwright.impl;
 
 import java.util.List;
+import com.microsoft.playwright.options.Clip;
+import com.microsoft.playwright.options.ScreenshotCaret;
+import com.microsoft.playwright.options.ScreenshotAnimations;
+import com.microsoft.playwright.options.ScreenshotScale;
 
 class Channel {
   String guid;
@@ -133,18 +137,15 @@ class PageExpectScreenshotOptions {
   boolean isNot;
   LocatorImpl locator;
   String comparator;
-  Double maxDiffPixels;
+  Integer maxDiffPixels;
   Double maxDiffPixelRatio;
   Double threshold;
   Boolean fullPage;
-  com.microsoft.playwright.options.Clip clip;
-  // Only "png" or "webp" are valid here, computed internally based on the snapshot
-  // file extension (there is no public "webp" value in ScreenshotType).
-  String type;
+  Clip clip;
   Boolean omitBackground;
-  com.microsoft.playwright.options.ScreenshotCaret caret;
-  com.microsoft.playwright.options.ScreenshotAnimations animations;
-  com.microsoft.playwright.options.ScreenshotScale scale;
+  ScreenshotCaret caret;
+  ScreenshotAnimations animations;
+  ScreenshotScale scale;
   List<LocatorImpl> mask;
   String maskColor;
   String style;
