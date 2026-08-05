@@ -395,11 +395,6 @@ public class LocatorAssertionsImpl extends AssertionsBase implements LocatorAsse
     hasScreenshotImpl(nameSegments, options);
   }
 
-  @Override
-  public void hasScreenshot(HasScreenshotOptions options) {
-    hasScreenshotImpl(null, options);
-  }
-
   private void hasScreenshotImpl(Object nameOrNames, HasScreenshotOptions options) {
     ScreenshotAssertionsOptions screenshotOptions = convertType(options, ScreenshotAssertionsOptions.class);
     new ScreenshotAssertionsHelper(actualLocator.frame.page, actualLocator, isNot).assertScreenshot(nameOrNames, screenshotOptions, "Assert \"hasScreenshot\"");

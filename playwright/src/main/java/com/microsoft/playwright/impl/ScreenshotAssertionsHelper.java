@@ -31,27 +31,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Locale;
 
-// Implements the Java counterpart of `toHaveScreenshot()`, ported from the
-// `SnapshotHelper` logic in `packages/playwright/src/matchers/toMatchSnapshot.ts`
-// of the upstream Playwright repository. Since the Java bindings do not have a
-// dedicated test-runner (unlike @playwright/test), the snapshot storage/update
-// conventions below are a Java-specific adaptation:
-//  - Snapshots are stored under "src/test/resources/__screenshots__/<TestClassSimpleName>/<name>"
-//    by default. Override the root with the "playwright.snapshotDir" system property.
-//  - Pass "-Dplaywright.updateSnapshots=true" to (re-)generate/update baseline snapshots,
-//    analogous to "--update-snapshots" for @playwright/test.
-// The actual pixel-level image comparison (pixelmatch/SSIM) is performed by the
-// Playwright driver (Node.js) via the "Page.expectScreenshot" protocol method -
-// this class only handles the Java-side snapshot lifecycle (resolving the file,
-// reading/writing baselines) and error formatting.
+// Java-side implementation of `hasScreenshot()`. The pixel-level comparison
+// itself is done by the driver via "Page.expectScreenshot"; this class only
+// resolves the baseline file and decides whether to create/update/compare it.
+//
+// There is no test runner here to derive a snapshot name from, so a name is
+// always required explicitly. Baselines are stored under
+// "src/test/resources/__screenshots__/<name>", overridable via the
+// "playwright.snapshotDir" system property; "-Dplaywright.updateSnapshots=true"
+// (re-)generates baselines.
 class ScreenshotAssertionsHelper {
   private static final String SNAPSHOT_DIR_PROPERTY = "playwright.snapshotDir";
   private static final String DEFAULT_SNAPSHOT_DIR = "src/test/resources/__screenshots__";
   private static final String UPDATE_SNAPSHOTS_PROPERTY = "playwright.updateSnapshots";
-  private static final ConcurrentHashMap<String, AtomicInteger> anonymousNameCounters = new ConcurrentHashMap<>();
 
   private final PageImpl page;
   private final LocatorImpl locator;
@@ -68,9 +62,8 @@ class ScreenshotAssertionsHelper {
       options = new ScreenshotAssertionsOptions();
     }
     Path expectedPath = resolveSnapshotPath(nameOrNames);
-    String extension = expectedPath.getFileName().toString().toLowerCase().endsWith(".webp") ? "webp" : "png";
 
-    PageExpectScreenshotOptions protocolOptions = toProtocolOptions(options, extension);
+    PageExpectScreenshotOptions protocolOptions = toProtocolOptions(options);
     protocolOptions.timeout = options.timeout == null ? AssertionsTimeout.defaultTimeout : options.timeout;
     protocolOptions.isNot = isNot;
 
@@ -129,7 +122,7 @@ class ScreenshotAssertionsHelper {
       (result.diff != null ? "\n  Diff: " + diffDebugPath(expectedPath) : ""));
   }
 
-  private PageExpectScreenshotOptions toProtocolOptions(ScreenshotAssertionsOptions options, String extension) {
+  private PageExpectScreenshotOptions toProtocolOptions(ScreenshotAssertionsOptions options) {
     PageExpectScreenshotOptions result = new PageExpectScreenshotOptions();
     result.locator = locator;
     result.animations = options.animations == null ? ScreenshotAnimations.DISABLED : options.animations;
@@ -138,12 +131,11 @@ class ScreenshotAssertionsHelper {
     result.fullPage = options.fullPage;
     result.omitBackground = options.omitBackground;
     result.scale = options.scale == null ? ScreenshotScale.CSS : options.scale;
-    result.maxDiffPixels = options.maxDiffPixels == null ? null : options.maxDiffPixels.doubleValue();
+    result.maxDiffPixels = options.maxDiffPixels;
     result.maxDiffPixelRatio = options.maxDiffPixelRatio;
     result.threshold = options.threshold;
     result.maskColor = options.maskColor;
     result.style = options.style;
-    result.type = extension;
     if (options.mask != null) {
       List<LocatorImpl> mask = new ArrayList<>();
       for (Locator l : options.mask) {
@@ -159,49 +151,38 @@ class ScreenshotAssertionsHelper {
   }
 
   private static Path resolveSnapshotPath(Object nameOrNames) {
-    String name;
-    if (nameOrNames instanceof String[]) {
-      String[] segments = (String[]) nameOrNames;
-      name = String.join("-", segments);
-    } else if (nameOrNames instanceof String) {
-      name = (String) nameOrNames;
-    } else {
-      name = null;
-    }
-    StackTraceElement caller = callerFrame();
-    if (name == null || name.isEmpty()) {
-      String key = caller.getClassName() + "#" + caller.getMethodName();
-      int index = anonymousNameCounters.computeIfAbsent(key, k -> new AtomicInteger(0)).incrementAndGet();
-      name = caller.getMethodName() + "-" + index + ".png";
-    }
-    if (!name.toLowerCase().endsWith(".png") && !name.toLowerCase().endsWith(".webp")) {
-      throw new PlaywrightException("Screenshot name \"" + name + "\" must have a '.png' or '.webp' extension");
+    String[] segments = toSegments(nameOrNames);
+    String lastSegment = segments[segments.length - 1];
+    // The driver's comparator only supports PNG ("Only PNG screenshots are supported").
+    if (!lastSegment.toLowerCase(Locale.ROOT).endsWith(".png")) {
+      throw new PlaywrightException("Screenshot name \"" + lastSegment + "\" must have a '.png' extension");
     }
     String baseDir = System.getProperty(SNAPSHOT_DIR_PROPERTY, DEFAULT_SNAPSHOT_DIR);
-    String simpleClassName = simpleClassName(caller.getClassName());
-    return Paths.get(baseDir, simpleClassName, name);
-  }
-
-  private static String simpleClassName(String className) {
-    // Strip package name and any enclosing-class '$' qualifiers (e.g. anonymous/nested classes).
-    int dot = className.lastIndexOf('.');
-    String simple = dot == -1 ? className : className.substring(dot + 1);
-    int dollar = simple.indexOf('$');
-    return dollar == -1 ? simple : simple.substring(0, dollar);
-  }
-
-  private static StackTraceElement callerFrame() {
-    for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
-      String className = frame.getClassName();
-      if (className.startsWith("java.") || className.startsWith("jdk.")) {
-        continue;
-      }
-      if (className.startsWith("com.microsoft.playwright.impl.") || className.startsWith("com.microsoft.playwright.assertions.")) {
-        continue;
-      }
-      return frame;
+    Path path = Paths.get(baseDir);
+    for (String segment : segments) {
+      path = path.resolve(segment);
     }
-    throw new PlaywrightException("Could not determine the caller of the screenshot assertion to infer the snapshot name");
+    return path;
+  }
+
+  private static String[] toSegments(Object nameOrNames) {
+    if (nameOrNames instanceof String[]) {
+      String[] segments = (String[]) nameOrNames;
+      if (segments.length == 0) {
+        throw new PlaywrightException("Screenshot name segments must not be empty");
+      }
+      for (String segment : segments) {
+        if (segment == null || segment.isEmpty()) {
+          throw new PlaywrightException("Screenshot name segments must not be null or empty");
+        }
+      }
+      return segments;
+    }
+    if (nameOrNames instanceof String && !((String) nameOrNames).isEmpty()) {
+      return new String[] { (String) nameOrNames };
+    }
+    throw new PlaywrightException(
+      "A screenshot name is required, for example: assertThat(page).hasScreenshot(\"example.png\")");
   }
 
   private static byte[] readFile(Path path) {
