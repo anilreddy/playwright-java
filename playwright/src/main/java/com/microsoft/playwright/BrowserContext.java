@@ -450,6 +450,16 @@ public interface BrowserContext extends AutoCloseable {
   }
   class StorageStateOptions {
     /**
+     * Set to {@code true} to include the context's virtual WebAuthn {@link com.microsoft.playwright.BrowserContext#credentials
+     * BrowserContext.credentials()} (passkeys) in the storage state snapshot. The captured credentials carry their private
+     * keys, so they can be re-seeded into a later context via the {@code storageState} option or {@link
+     * com.microsoft.playwright.BrowserContext#setStorageState BrowserContext.setStorageState()}. Note that restoring the
+     * storage state that contains credentials will automatically install the virtual WebAuthn authenticator (see {@link
+     * com.microsoft.playwright.Credentials#install Credentials.install()}), and prevent all real authenticators from working
+     * in this context.
+     */
+    public Boolean credentials;
+    /**
      * Set to {@code true} to include <a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API">IndexedDB</a> in
      * the storage state snapshot. If your application uses IndexedDB to store authentication tokens, like Firebase
      * Authentication, enable this.
@@ -461,6 +471,19 @@ public interface BrowserContext extends AutoCloseable {
      */
     public Path path;
 
+    /**
+     * Set to {@code true} to include the context's virtual WebAuthn {@link com.microsoft.playwright.BrowserContext#credentials
+     * BrowserContext.credentials()} (passkeys) in the storage state snapshot. The captured credentials carry their private
+     * keys, so they can be re-seeded into a later context via the {@code storageState} option or {@link
+     * com.microsoft.playwright.BrowserContext#setStorageState BrowserContext.setStorageState()}. Note that restoring the
+     * storage state that contains credentials will automatically install the virtual WebAuthn authenticator (see {@link
+     * com.microsoft.playwright.Credentials#install Credentials.install()}), and prevent all real authenticators from working
+     * in this context.
+     */
+    public StorageStateOptions setCredentials(boolean credentials) {
+      this.credentials = credentials;
+      return this;
+    }
     /**
      * Set to {@code true} to include <a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API">IndexedDB</a> in
      * the storage state snapshot. If your application uses IndexedDB to store authentication tokens, like Firebase
@@ -1469,7 +1492,8 @@ public interface BrowserContext extends AutoCloseable {
    */
   void setOffline(boolean offline);
   /**
-   * Returns storage state for this browser context, contains current cookies, local storage snapshot and IndexedDB snapshot.
+   * Returns storage state for this browser context, contains current cookies, local storage snapshot, IndexedDB snapshot and
+   * virtual WebAuthn credentials.
    *
    * @since v1.8
    */
@@ -1477,13 +1501,17 @@ public interface BrowserContext extends AutoCloseable {
     return storageState(null);
   }
   /**
-   * Returns storage state for this browser context, contains current cookies, local storage snapshot and IndexedDB snapshot.
+   * Returns storage state for this browser context, contains current cookies, local storage snapshot, IndexedDB snapshot and
+   * virtual WebAuthn credentials.
    *
    * @since v1.8
    */
   String storageState(StorageStateOptions options);
   /**
-   * Clears the existing cookies, local storage and IndexedDB entries for all origins and sets the new storage state.
+   * Clears the existing cookies, local storage, IndexedDB entries and virtual WebAuthn credentials, and sets the new storage
+   * state. When the storage state contains credentials, the virtual WebAuthn authenticator is installed (equivalent to
+   * {@link com.microsoft.playwright.Credentials#install Credentials.install()}), preventing all real authenticators from
+   * working in this context.
    *
    * <p> <strong>Usage</strong>
    * <pre>{@code
