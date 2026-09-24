@@ -107,6 +107,19 @@ public class TestScreenshotAssertions extends TestBase {
   }
 
   @Test
+  void shouldRejectSnapshotPathTraversal() {
+    page.setContent("<div>Hello</div>");
+
+    PlaywrightException e = assertThrows(PlaywrightException.class, () ->
+      assertThat(page).hasScreenshot("../outside.png"));
+    assertTrue(e.getMessage().contains("outside the snapshot directory"), e.getMessage());
+
+    PlaywrightException segmentException = assertThrows(PlaywrightException.class, () ->
+      assertThat(page).hasScreenshot(new String[] {"..", "outside.png"}));
+    assertTrue(segmentException.getMessage().contains("outside the snapshot directory"), segmentException.getMessage());
+  }
+
+  @Test
   void shouldRequireAnExplicitName() {
     page.setContent("<div>Hello</div>");
     assertThrows(PlaywrightException.class, () -> assertThat(page).hasScreenshot((String) null));
