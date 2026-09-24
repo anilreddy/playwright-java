@@ -24,9 +24,11 @@ import com.microsoft.playwright.options.ScreenshotScale;
 import org.opentest4j.AssertionFailedError;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -92,7 +94,7 @@ class ScreenshotAssertionsHelper {
         writeDebugArtifacts(expectedPath, result);
         throw new AssertionFailedError(title + "\n" + result.errorMessage + callLog(result.log));
       }
-      Utils.writeToFile(result.actual, expectedPath);
+      writeFile(result.actual, expectedPath);
       return;
     }
 
@@ -158,9 +160,18 @@ class ScreenshotAssertionsHelper {
       throw new PlaywrightException("Screenshot name \"" + lastSegment + "\" must have a '.png' extension");
     }
     String baseDir = System.getProperty(SNAPSHOT_DIR_PROPERTY, DEFAULT_SNAPSHOT_DIR);
-    Path path = Paths.get(baseDir);
+    Path snapshotDir = Paths.get(baseDir).toAbsolutePath().normalize();
+    Path path = snapshotDir;
     for (String segment : segments) {
-      path = path.resolve(segment);
+      Path segmentPath = Paths.get(segment);
+      if (segmentPath.isAbsolute()) {
+        throw new PlaywrightException("Screenshot name must be relative: " + segment);
+      }
+      path = path.resolve(segmentPath).normalize();
+    }
+
+    if (!path.startsWith(snapshotDir)) {
+      throw new PlaywrightException("Screenshot name resolves outside the snapshot directory: " + path);
     }
     return path;
   }
@@ -215,10 +226,32 @@ class ScreenshotAssertionsHelper {
 
   private static void writeDebugArtifacts(Path expectedPath, PageImpl.ExpectScreenshotResult result) {
     if (result.actual != null) {
-      Utils.writeToFile(result.actual, actualDebugPath(expectedPath));
+      writeFile(result.actual, actualDebugPath(expectedPath));
     }
     if (result.diff != null) {
-      Utils.writeToFile(result.diff, diffDebugPath(expectedPath));
+      writeFile(result.diff, diffDebugPath(expectedPath));
+    }
+  }
+
+  private static void writeFile(byte[] bytes, Path path) {
+    Path temp = null;
+    try {
+      temp = Files.createTempFile(path.getParent(), path.getFileName().toString(), ".tmp");
+      Utils.writeToFile(bytes, temp);
+      try {
+        Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+      } catch (AtomicMoveNotSupportedException e) {
+        Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+      }
+    } catch (IOException e) {
+      try {
+        if (temp != null) {
+          Files.deleteIfExists(temp);
+        }
+      } catch (IOException ignored) {
+        // Preserve the original write failure.
+      }
+      throw new PlaywrightException("Failed to write screenshot file: " + path, e);
     }
   }
 
